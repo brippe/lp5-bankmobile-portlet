@@ -1,0 +1,12 @@
+.errors {font-weight: bold;text-align: left;color: #600;}
+ul li {list-style: none;}
+.textStyle {font-size: 10pt; font-weight: normal;}
+.textStyleSmaller {font-size: 8pt; font-weight: normal;}
+.textBold {font-weight: bold;}
+.text10Bold {font-weight: bold;}
+.imgClass {vertical-align: middle; margin-left: 7px; }
+.imgClassBullet {vertical-align: middle; margin-left: 65px;}
+img { padding: 3px }
+.boximage {height: 75px;}
+.bbTxt {vertical-align:middle; padding:3px}
+.bbImg {height:63px;width:95px;text-align:left;vertical-align: middle;}

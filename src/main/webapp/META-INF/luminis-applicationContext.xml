@@ -1,0 +1,45 @@
+<!-- *********************************************************************
+         Master configuration for DataSource , Entity Manager factory and
+         other global configuration stuff need across the application.
+       *******************************************************************  -->
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans-3.0.xsd">
+
+    <!-- Abstract bean for setting the bootstrap properties file location. -->
+    <bean id="configFileLocation" abstract="true">
+        <property name="location" value="classpath:bootstrap.properties"/>
+    </bean>
+
+    <!-- ==========================================================
+    | Instantiate property config placeholder to substitute properties
+    | in embedded context fragments
+    =============================================================== -->
+    <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer"
+          parent="configFileLocation" />
+
+    <bean id="nodeNameConsumer" abstract="true">
+        <property name="nodeName" value="${local.host}-luminis"/>
+    </bean>
+
+    <!-- Abstract bean for mapping insecure to secure ports -->
+    <bean id="luminisPortMapping" abstract="true">
+        <property name="portMappings">
+            <map>
+                <entry key="${portal.http.port}" value="${portal.https.port}"/>
+            </map>
+        </property>
+    </bean>
+
+    <bean id="config" class="edu.nocccd.portlets.lp.config.AppConfig">
+        <constructor-arg name="clientCode" value=""/>
+        <constructor-arg name="sharedKey" value=""/>
+        <constructor-arg name="refundURL" value="https://www.refundselection.com/#landing?token="/>
+    </bean>
+
+    <import resource="luminis-security.xml"/>
+    <import resource="classpath:META-INF/luminis-config-applicationContextFragment.xml" />
+    <import resource="classpath:META-INF/luminis-session-counter-applicationContext.xml"/>
+
+</beans>

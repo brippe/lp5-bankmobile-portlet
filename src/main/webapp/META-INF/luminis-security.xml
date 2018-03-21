@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:security="http://www.springframework.org/schema/security"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+         http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+         http://www.springframework.org/schema/security
+         http://www.springframework.org/schema/security/spring-security-3.0.xsd">
+
+  <bean id="luminisSecurityFilterChainProxy"
+        class="org.springframework.security.web.FilterChainProxy">
+    <security:filter-chain-map path-type="ant">
+      <security:filter-chain pattern="/**"
+                             filters="secureChannelProcessingFilter,
+                                      concurrentSessionFilter,
+                                      httpSessionContextIntegrationFilter,
+                                      exceptionTranslationFilter,
+                                      authenticatedChannelProcessingFilter"
+      />
+    </security:filter-chain-map>
+  </bean>
+
+  <!-- The Secure Channel Processing Filter determines whether the requested URLs must be
+       accessed via a secure channel (https), insecure (http), or either.  The order and content
+       of the filter-invocation-definition-source section determines which URLs require security. -->
+  
+    <bean id="secureChannelProcessingFilter"
+          class="org.springframework.security.web.access.channel.ChannelProcessingFilter">
+      <property name="channelDecisionManager" ref="secureChannelDecisionManager"/>
+      <property name="securityMetadataSource">
+        <security:filter-security-metadata-source path-type="ant">
+          <security:intercept-url pattern="/**" access="REQUIRES_SECURE_CHANNEL"/>
+        </security:filter-security-metadata-source>
+      </property>
+    </bean>
+
+
+  <bean id="secureChannelDecisionManager" 
+        class="com.sghe.luminis.security.spring.securechannel.LuminisChannelDecisionManagerImpl">
+     <property name="channelProcessors">
+       <list>
+         <ref bean="secureChannelProcessor"/>
+         <ref bean="insecureChannelProcessor"/>
+       </list>
+     </property>
+     <property name="configuration" ref="configurationservice"/>
+  </bean>
+  
+  <bean id="secureChannelProcessor" class="org.springframework.security.web.access.channel.SecureChannelProcessor">
+       <property name="entryPoint" ref="retryWithHttpsEntryPoint"/>
+  </bean>
+
+  <bean id="retryWithHttpsEntryPoint" class="org.springframework.security.web.access.channel.RetryWithHttpsEntryPoint">
+    <property name="portMapper" ref="luminisSecurePortMapper"/>
+  </bean>
+
+  <bean id="luminisSecurePortMapper" class="org.springframework.security.web.PortMapperImpl"
+        parent="luminisPortMapping" />
+
+  <bean id="insecureChannelProcessor" class="org.springframework.security.web.access.channel.InsecureChannelProcessor"/>
+
+  <!-- ============================= end secure channel processing filter definition ======================== -->
+
+  <bean id="concurrentSessionFilter" 
+        class="org.springframework.security.web.session.ConcurrentSessionFilter">
+    <property name="expiredUrl" value="/luminis/jsp/error/sessionexpired.jsp"/>
+    <property name="sessionRegistry"><ref local="sessionRegistry"/></property>
+  </bean>
+
+  <bean id="httpSessionContextIntegrationFilter" 
+        class="com.sghe.luminis.security.spring.context.SecurityContextIntegrationFilter">
+        <property name="securityContextRepository" ref="sharedSecurityContextRepository"/>
+  </bean>
+  <bean name="sharedSecurityContextRepository" 
+        class="com.sghe.luminis.security.spring.context.SharedSessionSecurityContextRepository" />
+ 
+  <bean id="sessionRegistry" 
+        class="org.springframework.security.core.session.SessionRegistryImpl"/>
+
+  <bean id="exceptionTranslationFilter" 
+        class="org.springframework.security.web.access.ExceptionTranslationFilter">
+      <property name="authenticationEntryPoint"><ref local="casProcessingFilterEntryPoint"/></property>
+      <property name="accessDeniedHandler"><ref local="accessDeniedHandler"/></property>
+  </bean>
+  
+    <bean id="casProcessingFilterEntryPoint" 
+          class="com.sghe.luminis.security.spring.ui.cas.DynamicCasProcessingFilterEntryPoint">
+      <property name="loginUrl" value="https://${cas.host}/login"/>
+      <property name="targetHostServiceProperties" ref="targetHostServiceProperties"/>
+      <property name="serviceProperties"><ref bean="serviceProperties"/></property>
+    </bean>
+  
+    <bean id="targetHostServiceProperties" 
+          class="com.sghe.luminis.security.spring.ui.cas.TargetHostServiceProperties">
+        <property name="protocol" value="https"/>
+        <property name="loginPath" value="/c/portal/login"/>
+        <property name="defaultServiceProperties" ref="serviceProperties"/>
+    </bean>
+    
+    <bean id="serviceProperties" 
+        class="org.springframework.security.cas.ServiceProperties">
+        <property name="service" value="https://${portal.virtual.host}:${portal.virtual.https.port}/c/portal/login"/>
+        <property name="sendRenew" value="false"/>
+    </bean>
+
+  <bean id="accessDeniedHandler" 
+        class="com.sghe.luminis.security.spring.ui.AccessDeniedHandlerImpl">
+      <property name="errorPage" value="/luminis/jsp/error/serverbusy.jsp?dologout=false"/>
+  </bean>
+
+    <!-- The Authenticated Channel Processor decides which requests must be authenticated to be honored
+         and which do not.  Un-authenticated access to an URL requiring authentication will throw an
+         authentication exception, which will be caught by the ExceptionTranslationFilter.  That filter
+         will then redirect the request to the configured authorization service, which is CAS by default.
+         The order and content of the patterns in the filter-invocation-definition-source section will
+         determine which URLs require authentication and which don't. -->
+  
+    <bean id="authenticatedChannelProcessingFilter" 
+          class="org.springframework.security.web.access.channel.ChannelProcessingFilter">
+      <property name="channelDecisionManager" ref="authenticatedChannelDecisionManager"/>
+      <property name="securityMetadataSource">
+        <security:filter-security-metadata-source path-type="ant">
+          <security:intercept-url pattern="/**" access="REQUIRES_AUTHENTICATION"/>
+        </security:filter-security-metadata-source>
+      </property>
+    </bean>
+  
+    <bean id="authenticatedChannelDecisionManager" 
+          class="org.springframework.security.web.access.channel.ChannelDecisionManagerImpl">
+       <property name="channelProcessors">
+         <list>
+           <ref bean="authenticatedChannelProcessor"/>
+           <ref bean="sessionLimitedChannelProcessor"/>
+         </list>
+       </property>
+    </bean>
+  
+    <bean id="authenticatedChannelProcessor"
+          class="com.sghe.luminis.security.spring.securechannel.SessionLimitedAuthenticatedChannelProcessor">
+        <property name="authenticationRequired" value="true"/>
+        <property name="secureKeyword" value="REQUIRES_AUTHENTICATION"/>
+        <property name="sessionCounter" ref="sessionCounter"/>
+    </bean>
+  
+    <bean id="sessionLimitedChannelProcessor"
+          class="com.sghe.luminis.security.spring.securechannel.SessionLimitedAuthenticatedChannelProcessor">
+        <property name="authenticationRequired" value="false"/>
+        <property name="secureKeyword" value="AUTH_NOT_REQUIRED_SESSION_LIMITED"/>
+        <property name="sessionCounter" ref="sessionCounter"/>
+    </bean>
+
+</beans>
